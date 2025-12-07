@@ -203,3 +203,37 @@ void Graph::dijkstra(const std::string &startNode, const std::string &endNode) {
     std::cout << "\nTotal Cost: " << distances[endNode] << std::endl;
   }
 }
+
+void Graph::removeVertex(const std::string &name) {
+  adjacencyList.erase(name);
+  for (auto& [vertex, neighbors] : adjacencyList) {
+    neighbors.erase(
+        std::remove_if(neighbors.begin(), neighbors.end(),
+                      [&](const auto& p){ return p.first == name; }),
+        neighbors.end()
+    );
+  }
+}
+
+void Graph::removeEdge(const std::string &u, const std::string &v, bool isDirected) {
+  auto remove = [&](const std::string &from, const std::string &to) {
+    auto &neighbors = adjacencyList[from];
+    neighbors.erase(
+        std::remove_if(neighbors.begin(), neighbors.end(),
+                      [&](const auto& p){ return p.first == to; }),
+        neighbors.end()
+    );
+  };
+  remove(u, v);
+  if (!isDirected) remove(v, u);
+}
+
+Graph Graph::getCopy() const {
+  Graph g;
+  g.adjacencyList = adjacencyList;
+  return g;
+}
+
+void Graph::restoreFrom(const Graph& snapshot) {
+  adjacencyList = snapshot.adjacencyList;
+}

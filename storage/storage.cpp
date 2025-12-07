@@ -226,57 +226,75 @@ namespace ChronoDB {
     }
 
     bool StorageEngine::insertRecord(const string& tableName, const Record& rec) {
-        vector<uint8_t> bytes; serializeRecord(rec, bytes);
-        if (bytes.size() + sizeof(SlotEntry) > PAGE_SIZE - PAGE_HEADER_RESERVED) return false;
+        vector<Record> records = loadAllRecords(tableName);
 
-        uint32_t pages = pageCount(tableName);
-        if (pages == 0) appendEmptyPage(tableName);
+        int id = get<int>(rec.fields[0]);
+        // Remove existing record with same ID if present
+        records.erase(
+            remove_if(records.begin(), records.end(),
+                    [&](const Record& r){ return get<int>(r.fields[0]) == id; }),
+            records.end()
+        );
+
+        records.push_back(rec);
+
+        // Write all records to file using same logic as updateRecord
+        ofstream out(tableDataPath(tableName), ios::binary | ios::trunc);
+        if (!out) return false;
 
         Page p;
-        readPageFromFile(tableName, pages - 1, p);
-        auto optSlot = p.insertRawRecord(bytes);
-        if (!optSlot.has_value()) {
-            uint32_t newPageIdx = appendEmptyPage(tableName);
-            readPageFromFile(tableName, newPageIdx, p);
-            optSlot = p.insertRawRecord(bytes);
-            if (!optSlot.has_value()) return false;
-            writePageToFile(tableName, newPageIdx, p);
-            return true;
+        p.pageID = 0;
+        for (const auto& r : records) {
+            vector<uint8_t> bytes;
+            serializeRecord(r, bytes);
+            auto optSlot = p.insertRawRecord(bytes);
+            if (!optSlot.has_value()) {
+                vector<uint8_t> buffer; p.serializeToBuffer(buffer);
+                out.write((char*)buffer.data(), buffer.size());
+                p = Page(); p.pageID++;
+                p.insertRawRecord(bytes);
+            }
         }
-        writePageToFile(tableName, pages - 1, p);
+        vector<uint8_t> buffer; p.serializeToBuffer(buffer);
+        out.write((char*)buffer.data(), buffer.size());
+        out.close();
         return true;
     }
+
 
     bool StorageEngine::updateRecord(const string& tableName, int id, const Record& newRecord) {
         vector<Record> records = loadAllRecords(tableName);
-
         bool updated = false;
         for (auto& r : records) {
-            if (get<int>(r.fields[0]) == id) {
-                r = newRecord;
-                updated = true;
-                break;
-            }
+            if (get<int>(r.fields[0]) == id) { r = newRecord; updated = true; break; }
         }
         if (!updated) return false;
 
+        // Clear file
         ofstream out(tableDataPath(tableName), ios::binary | ios::trunc);
+        if (!out) return false;
+
+        Page p;
+        p.pageID = 0;
         for (const auto& rec : records) {
             vector<uint8_t> bytes;
             serializeRecord(rec, bytes);
-            Page newPage;
-            newPage.pageID = 0;
-            auto optSlot = newPage.insertRawRecord(bytes);
-            if (optSlot.has_value()) {
-                vector<uint8_t> buffer;
-                newPage.serializeToBuffer(buffer);
+            auto optSlot = p.insertRawRecord(bytes);
+            if (!optSlot.has_value()) {
+                // Page full, write current page and start new page
+                vector<uint8_t> buffer; p.serializeToBuffer(buffer);
                 out.write((char*)buffer.data(), buffer.size());
+                p = Page();
+                p.pageID++;
+                p.insertRawRecord(bytes);
             }
         }
+        vector<uint8_t> buffer; p.serializeToBuffer(buffer);
+        out.write((char*)buffer.data(), buffer.size());
         out.close();
-
         return true;
     }
+
 
     bool StorageEngine::deleteRecord(const string& tableName, int id) {
         vector<Record> records = loadAllRecords(tableName);

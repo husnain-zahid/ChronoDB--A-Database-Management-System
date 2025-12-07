@@ -7,30 +7,32 @@
 #include <functional>
 #include "../storage/storage.h"
 #include "lexer.h"
-
-// #include "../indexing/index.h"  <-- COMMENTED OUT DEPENDENCY
+#include "../graph/graph.h"
 
 namespace ChronoDB {
 
     class Parser {
     public:
-        // Removed IndexingEngine from constructor
-        Parser(StorageEngine& storageRef); 
+        Parser(StorageEngine& storageRef, GraphEngine& graphRef); 
         
         void parseAndExecute(const std::string& command);
         void undo(); 
+        void redo();
 
     private:
         StorageEngine& storage;
-        // IndexingEngine& index; <-- COMMENTED OUT
-        
+        GraphEngine& graph;
+
         std::stack<std::function<void()>> undoStack; 
+        std::stack<std::function<void()>> redoStack; // NEW
 
         void handleCreate(const std::vector<Token>& tokens);
         void handleInsert(const std::vector<Token>& tokens);
         void handleUpdate(const std::vector<Token>& tokens);
         void handleDelete(const std::vector<Token>& tokens);
         void handleSelect(const std::vector<Token>& tokens);
+
+        void handleGraph(const std::vector<Token>& tokens); // NEW
     };
 
 }

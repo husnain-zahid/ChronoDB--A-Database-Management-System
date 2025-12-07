@@ -15,8 +15,7 @@
 class Graph {
 private:
   // Adjacency List: Node -> Vector of pairs (Neighbor, Weight)
-  std::unordered_map<std::string, std::vector<std::pair<std::string, int>>>
-      adjacencyList;
+  std::unordered_map<std::string, std::vector<std::pair<std::string, int>>>adjacencyList;
 
 public:
   // Constructor
@@ -24,14 +23,19 @@ public:
 
   // Core Graph Operations
   void addVertex(const std::string &name);
-  void addEdge(const std::string &u, const std::string &v, int weight,
-               bool isDirected);
+  void addEdge(const std::string &u, const std::string &v, int weight,bool isDirected);
   void printGraph() const;
 
   // Algorithms
   void bfs(const std::string &startNode);
   void dfs(const std::string &startNode);
   void dijkstra(const std::string &startNode, const std::string &endNode);
+
+  //new helpers for like undo and redo
+  void removeVertex(const std::string &name);
+  void removeEdge(const std::string &u, const std::string &v, bool isDirected = false);
+  Graph getCopy() const; //returns a copy of the current graph
+  void restoreFrom(const Graph& snapshot);
 };
 
 class GraphEngine {
